@@ -1,12 +1,9 @@
 import torch.nn as nn
 
-loss_fn_age = nn.CrossEntropyLoss()
-loss_fn_gen = nn.BCELoss()
-loss_fn_rac = nn.CrossEntropyLoss()
-sig = nn.Sigmoid()
+class CustomMultiTaskLoss(nn.Module):
+  def __init__(self, fns=None):
+    super(CustomMultiTaskLoss, self).__init__()
+    self.loss_fns = [getattr(nn, fn)() for fn in fns] 
 
-def multi_head_classifications_loss(age_out, gen_out, rac_out, age_tar, gen_tar, rac_tar):
-    loss_age = loss_fn_age(age_out, age_tar)
-    loss_gen = loss_fn_gen(sig(gen_out), gen_tar.unsqueeze(1).float())
-    loss_rac = loss_fn_rac(rac_out, rac_tar)
-    return loss_age, loss_gen, loss_rac
+  def forward(self, predictions, target):
+      return [loss_fn(predictions[idx], target[idx]) for idx, loss_fn in enumerate(self.loss_fns)]

@@ -8,14 +8,13 @@ from itertools import repeat
 from collections import OrderedDict
 import gdown
 
+# Define the labels and corresponding age ranges
+new_ranges = ['1-3', '4-7', '8-12', '13-19', '20-35', '36-55', '56-75', '76-116']
+# new_label_classes = ['Baby', 'Child', 'Preteen', 'Teenager', 'Young Adult', 'Adult', 'Senior', 'Elderly']
+new_labels = [0, 1, 2, 3, 4, 5, 6, 7]
 
 def categorize_age(age):
     """Create a function to categorize an age."""
-    # Define the labels and corresponding age ranges
-    new_ranges = ['1-3', '4-7', '8-12', '13-19', '20-35', '36-55', '56-75', '76-116']
-    # new_label_classes = ['Baby', 'Child', 'Preteen', 'Teenager', 'Young Adult', 'Adult', 'Senior', 'Elderly']
-    new_labels = [0, 1, 2, 3, 4, 5, 6, 7]
-
     for i, age_range in enumerate(new_ranges):
         start, end = map(int, age_range.split('-'))
         if start <= age <= end:

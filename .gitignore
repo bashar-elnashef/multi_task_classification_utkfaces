@@ -105,7 +105,8 @@ data/
 input/
 saved/
 datasets/
-best_model.pth
+base/best_model.pth
+demo_notebook_2.ipynb
 
 # editor, os cache directory
 .vscode/

@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 from torchvision.utils import make_grid
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
@@ -13,6 +14,7 @@ class Trainer(BaseTrainer):
                  data_loader, valid_data_loader=None, lr_scheduler=None, len_epoch=None):
         super().__init__(model, criterion, metric_ftns, optimizer, config)
         self.config = config
+        self.tasks = self.config ['loss']['tasks']
         self.device = device
         self.data_loader = data_loader
         if len_epoch is None:
@@ -26,12 +28,19 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
+        # self.train_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
+        #                                     *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
-        self.train_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
-                                            *[m.__name__ for m in self.metric_ftns], writer=self.writer)
-        self.valid_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
-                                            *[m.__name__ for m in self.metric_ftns], writer=self.writer)
+        # self.valid_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
+        #                                     *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
+        self.train_metrics = MetricTracker('loss', *[f'loss_{tsk}' for tsk in self.tasks], 
+                *[f'{m.__name__}_{tsk}' for tsk in self.tasks for m in self.metric_ftns], writer=self.writer)
+
+        self.valid_metrics = MetricTracker('loss', *[f'loss_{tsk}' for tsk in self.tasks],  
+                *[f'{m.__name__}_{tsk}' for tsk in self.tasks for m in self.metric_ftns], writer=self.writer)
+
+        self.sig = nn.Sigmoid()
 
     def _train_epoch(self, epoch):
         """
@@ -44,25 +53,28 @@ class Trainer(BaseTrainer):
         self.train_metrics.reset()
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data = data.to(self.device)
-            age_tar = target['age'].to(self.device)
-            gen_tar = target['gender'].to(self.device)
-            rac_tar = target['race'].to(self.device)
+            age_tar = target[self.tasks[0]].to(self.device)
+            gen_tar = target[self.tasks[1]].to(self.device)
+            rac_tar = target[self.tasks[2]].to(self.device)
+            true = [age_tar, gen_tar.unsqueeze(1).float(), rac_tar]
 
             self.optimizer.zero_grad()
-            age_out, gen_out, rac_out = self.model(data)
-            loss_age, loss_gen, loss_rac = self.criterion(age_out, gen_out, rac_out, age_tar, gen_tar, rac_tar)
-            loss = loss_age + loss_gen + loss_rac
+            age_pred, gen_pred, rac_pred = self.model(data)
+            pred = [age_pred, self.sig(gen_pred), rac_pred]
+
+            loss_age, loss_gender, loss_race = self.criterion(pred, true)
+            loss = loss_age + loss_gender + loss_race
             loss.backward()
+
             self.optimizer.step()
 
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.train_metrics.update('loss', loss.item())
-            self.train_metrics.update('loss_age', loss_age.item())
-            self.train_metrics.update('loss_gender', loss_gen.item())
-            self.train_metrics.update('loss_race', loss_rac.item())
 
-            for met in self.metric_ftns:
-                self.train_metrics.update(met.__name__, met(age_out, age_tar))
+            for idx, tsk in enumerate(self.tasks):
+                self.train_metrics.update(f'loss_{tsk}', locals()[f'loss_{tsk}'].item())
+                for met in self.metric_ftns:
+                    self.train_metrics.update(f'{met.__name__}_{tsk}', met(pred[idx], true[idx]))
 
             if batch_idx % self.log_step == 0:
                 self.logger.debug('Train Epoch: {} {} Loss: {:.6f}'.format(
@@ -95,23 +107,24 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(self.valid_data_loader):
                 data = data.to(self.device)
-                age_tar = target['age'].to(self.device)
-                gen_tar = target['gender'].to(self.device)
-                rac_tar = target['race'].to(self.device)
+                age_tar = target[self.tasks[0]].to(self.device)
+                gen_tar = target[self.tasks[1]].to(self.device)
+                rac_tar = target[self.tasks[2]].to(self.device)
+                true = [age_tar, gen_tar.unsqueeze(1).float(), rac_tar]
 
-                age_out, gen_out, rac_out = output = self.model(data)
-                loss_age, loss_gen, loss_rac = self.criterion(age_out, gen_out, rac_out, age_tar, gen_tar, rac_tar)
-                loss = loss_age + loss_gen + loss_rac
+                age_pred, gen_pred, rac_pred = self.model(data)
+
+                pred = [age_pred, self.sig(gen_pred), rac_pred]
+                loss_age, loss_gender, loss_race = self.criterion(pred, true)
+                loss = loss_age + loss_gender + loss_race
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.valid_metrics.update('loss', loss.item())
-                self.valid_metrics.update('loss_age', loss_age.item())
-                self.valid_metrics.update('loss_gender', loss_gen.item())
-                self.valid_metrics.update('loss_race', loss_rac.item())
-                
-                for met in self.metric_ftns:
-                    # self.valid_metrics.update(met.__name__, met(output, target))
-                    self.valid_metrics.update(met.__name__, met(age_out, age_tar))
+
+                for idx, tsk in enumerate(self.tasks):
+                    self.valid_metrics.update(f'loss_{tsk}', locals()[f'loss_{tsk}'].item())
+                    for met in self.metric_ftns:
+                        self.valid_metrics.update(f'{met.__name__}_{tsk}', met(pred[idx], true[idx]))
 
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 

@@ -25,9 +25,6 @@ def main(config):
     valid_data_loader = data_loader.split_validation()
 
     # build model architecture, then print to console
-    # backbone = resnet34(pretrained=True)
-    # # backbone = config.init_obj('backbone', resnet34, pretrained=True)
-
     model = config.init_obj('arch', module_arch)
     logger.info(model)
 
@@ -38,7 +35,7 @@ def main(config):
         model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # get function handles of loss and metrics
-    criterion = getattr(module_loss, config['loss'])
+    criterion = getattr(module_loss, config['loss']['type'])(fns=config['loss']['fns'])
     metrics = [getattr(module_metric, met) for met in config['metrics']]
 
     # build optimizer, learning rate scheduler. delete every lines containing lr_scheduler for disabling scheduler

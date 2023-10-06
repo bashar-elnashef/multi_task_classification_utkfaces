@@ -14,7 +14,7 @@
         "type": "UTKFaceDataLoader",
         "args":{
             "data_dir": "data/UTKFaces/",
-            "batch_size": 256,
+            "batch_size": 512,
             "shuffle": true,
             "validation_split": 0.2,
             "num_workers": 2,
@@ -29,9 +29,13 @@
             "amsgrad": true
         }
     },
-    "loss": "multi_head_classifications_loss",
+    "loss": {
+        "type": "CustomMultiTaskLoss",
+        "fns": ["CrossEntropyLoss", "BCELoss", "CrossEntropyLoss"],
+        "tasks": ["age", "gender", "race"]
+    },
     "metrics": [
-        "accuracy", "top_k_acc"
+        "accuracy"
     ],
     "lr_scheduler": {
         "type": "StepLR",
@@ -49,7 +53,6 @@
         
         "monitor": "min val_loss",
         "early_stop": 10,
-
         "tensorboard": true
     }
 }
