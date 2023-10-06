@@ -105,6 +105,7 @@ data/
 input/
 saved/
 datasets/
+best_model.pth
 
 # editor, os cache directory
 .vscode/
