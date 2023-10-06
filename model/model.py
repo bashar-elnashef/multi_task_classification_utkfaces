@@ -18,5 +18,6 @@ class HydraNetModified(BaseModel):
         age_head = self.net.fc1(self.net(x))
         gender_head = self.net.fc2(self.net(x))
         race_head = self.net.fc3(self.net(x))
+        
         return age_head, gender_head, race_head
 

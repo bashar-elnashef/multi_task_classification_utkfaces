@@ -28,11 +28,6 @@ class Trainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
-        # self.train_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
-        #                                     *[m.__name__ for m in self.metric_ftns], writer=self.writer)
-
-        # self.valid_metrics = MetricTracker('loss', 'loss_age', 'loss_gender', 'loss_race', 
-        #                                     *[m.__name__ for m in self.metric_ftns], writer=self.writer)
 
         self.train_metrics = MetricTracker('loss', *[f'loss_{tsk}' for tsk in self.tasks], 
                 *[f'{m.__name__}_{tsk}' for tsk in self.tasks for m in self.metric_ftns], writer=self.writer)
